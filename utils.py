@@ -34,40 +34,27 @@ def load_main_ticker(ticker, start, end):
     """Load the main stock data."""
     try:
         import warnings
-        warnings.filterwarnings('ignore', category=FutureWarning)
+        warnings.filterwarnings('ignore')
         
-        # Configure custom session to avoid impersonation issues
-        import requests
-        session = requests.Session()
-        session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        })
+        # Simple download is often more robust against recent yfinance bugs
+        df = yf.download(ticker, start=start, end=end, progress=False)
         
-        # Try multiple methods
-        df = pd.DataFrame()
-        
-        # Method 1: Ticker.history with custom session (if supported)
-        try:
-            dat = yf.Ticker(ticker, session=session)
-            df = dat.history(start=start, end=end, auto_adjust=False)
-        except Exception:
-            pass
-            
-        # Method 2: Standard download with ignore_tz
         if df.empty:
-            try:
-                df = yf.download(ticker, start=start, end=end, auto_adjust=False, progress=False, ignore_tz=True)
-            except Exception:
-                pass
+            # Retry with .BK suffix if missing (common for Thai stocks)
+            if not ticker.endswith('.BK') and not ticker.endswith('.bk'):
+                ticker = f"{ticker}.BK"
+                df = yf.download(ticker, start=start, end=end, progress=False)
         
         if df.empty:
             return None
             
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
+            
+        # Ensure columns are capitalized
         df.columns = [c.capitalize() for c in df.columns]
         
-        # Fix timezone issues
+        # Remove timezone if present
         if df.index.tz is not None:
             df.index = df.index.tz_localize(None)
             
@@ -80,20 +67,21 @@ def load_main_ticker(ticker, start, end):
 def load_global_markets(start, end):
     """Load global market indices and commodities."""
     import warnings
-    warnings.filterwarnings('ignore', category=FutureWarning)
+    warnings.filterwarnings('ignore')
     
     market_data = {}
     for name, symbol in GLOBAL_MARKETS.items():
         try:
-            dat = yf.Ticker(symbol)
-            df = dat.history(start=start, end=end, auto_adjust=False)
-            
-            if df.empty:
-                df = yf.download(symbol, start=start, end=end, auto_adjust=False, progress=False)
+            df = yf.download(symbol, start=start, end=end, progress=False)
                 
             if not df.empty:
                 if isinstance(df.columns, pd.MultiIndex):
                     df.columns = df.columns.get_level_values(0)
+                
+                # Fix timezone
+                if df.index.tz is not None:
+                    df.index = df.index.tz_localize(None)
+                    
                 market_data[name] = df['Close']
         except Exception as e:
             st.warning(f"Could not load {name}: {e}")
