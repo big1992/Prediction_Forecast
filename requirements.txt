@@ -1,0 +1,17 @@
+streamlit
+yfinance
+pandas
+numpy
+ta
+plotly
+scikit-learn
+tensorflow
+prophet
+matplotlib
+xgboost
+lightgbm
+shap
+fredapi
+pandas_ta
+torch
+einops
