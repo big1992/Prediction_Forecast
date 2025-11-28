@@ -33,7 +33,11 @@ MACRO_SERIES = {
 def load_main_ticker(ticker, start, end):
     """Load the main stock data."""
     try:
-        df = yf.download(ticker, start=start, end=end)
+        # Suppress warnings and use auto_adjust explicitly
+        import warnings
+        warnings.filterwarnings('ignore', category=FutureWarning)
+        
+        df = yf.download(ticker, start=start, end=end, auto_adjust=False, progress=False)
         if df.empty:
             return None
         if isinstance(df.columns, pd.MultiIndex):
@@ -47,10 +51,13 @@ def load_main_ticker(ticker, start, end):
 @st.cache_data
 def load_global_markets(start, end):
     """Load global market indices and commodities."""
+    import warnings
+    warnings.filterwarnings('ignore', category=FutureWarning)
+    
     market_data = {}
     for name, symbol in GLOBAL_MARKETS.items():
         try:
-            df = yf.download(symbol, start=start, end=end)
+            df = yf.download(symbol, start=start, end=end, auto_adjust=False, progress=False)
             if not df.empty:
                 if isinstance(df.columns, pd.MultiIndex):
                     df.columns = df.columns.get_level_values(0)
