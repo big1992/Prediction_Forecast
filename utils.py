@@ -33,19 +33,27 @@ MACRO_SERIES = {
 def load_main_ticker(ticker, start, end):
     """Load the main stock data."""
     try:
-        # Suppress warnings and use auto_adjust explicitly
+        # Suppress warnings
         import warnings
         warnings.filterwarnings('ignore', category=FutureWarning)
         
-        df = yf.download(ticker, start=start, end=end, auto_adjust=False, progress=False)
+        # Try using Ticker object first (often more reliable for single tickers)
+        dat = yf.Ticker(ticker)
+        df = dat.history(start=start, end=end, auto_adjust=False)
+        
+        # Fallback to download if empty
+        if df.empty:
+            df = yf.download(ticker, start=start, end=end, auto_adjust=False, progress=False)
+            
         if df.empty:
             return None
+            
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
         df.columns = [c.capitalize() for c in df.columns]
         return df
     except Exception as e:
-        st.error(f"Error loading data: {e}")
+        st.error(f"Error loading data for {ticker}: {e}")
         return None
 
 @st.cache_data
@@ -57,7 +65,12 @@ def load_global_markets(start, end):
     market_data = {}
     for name, symbol in GLOBAL_MARKETS.items():
         try:
-            df = yf.download(symbol, start=start, end=end, auto_adjust=False, progress=False)
+            dat = yf.Ticker(symbol)
+            df = dat.history(start=start, end=end, auto_adjust=False)
+            
+            if df.empty:
+                df = yf.download(symbol, start=start, end=end, auto_adjust=False, progress=False)
+                
             if not df.empty:
                 if isinstance(df.columns, pd.MultiIndex):
                     df.columns = df.columns.get_level_values(0)
