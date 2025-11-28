@@ -33,24 +33,44 @@ MACRO_SERIES = {
 def load_main_ticker(ticker, start, end):
     """Load the main stock data."""
     try:
-        # Suppress warnings
         import warnings
         warnings.filterwarnings('ignore', category=FutureWarning)
         
-        # Try using Ticker object first (often more reliable for single tickers)
-        dat = yf.Ticker(ticker)
-        df = dat.history(start=start, end=end, auto_adjust=False)
+        # Configure custom session to avoid impersonation issues
+        import requests
+        session = requests.Session()
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        })
         
-        # Fallback to download if empty
-        if df.empty:
-            df = yf.download(ticker, start=start, end=end, auto_adjust=False, progress=False)
+        # Try multiple methods
+        df = pd.DataFrame()
+        
+        # Method 1: Ticker.history with custom session (if supported)
+        try:
+            dat = yf.Ticker(ticker, session=session)
+            df = dat.history(start=start, end=end, auto_adjust=False)
+        except Exception:
+            pass
             
+        # Method 2: Standard download with ignore_tz
+        if df.empty:
+            try:
+                df = yf.download(ticker, start=start, end=end, auto_adjust=False, progress=False, ignore_tz=True)
+            except Exception:
+                pass
+        
         if df.empty:
             return None
             
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
         df.columns = [c.capitalize() for c in df.columns]
+        
+        # Fix timezone issues
+        if df.index.tz is not None:
+            df.index = df.index.tz_localize(None)
+            
         return df
     except Exception as e:
         st.error(f"Error loading data for {ticker}: {e}")
